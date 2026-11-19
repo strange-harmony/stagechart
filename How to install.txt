@@ -1,0 +1,53 @@
+STAGE CHART for Mac
+===================
+
+Turns a chord chart PDF (MultiTracks, SongSelect, or one downloaded from Planning Center)
+into a stage chart: light background, two columns, 17pt lyrics, same key as the original.
+The stage chart is saved in the same folder as the original. The original is never changed.
+
+Works on any Mac from macOS 11 (Big Sur) onward, Apple silicon or Intel. Nothing else to install.
+
+
+INSTALL (one time, about 2 minutes)
+-----------------------------------
+1. Double-click "Stage Chart.zip" to unzip it (if your Mac hasn't already).
+2. Drag "Stage Chart" into your Applications folder.
+3. Double-click "Stage Chart". Your Mac will say it can't check the app for malicious
+   software, because it wasn't bought from the App Store. Click "Done" (or "OK").
+4. Open System Settings > Privacy & Security. Scroll down to the message
+   "Stage Chart was blocked..." and click "Open Anyway". Enter your Mac password
+   if asked, then click "Open".
+5. That's it. From now on it opens with a normal double-click.
+
+If step 4 doesn't show "Open Anyway", open the Terminal app, paste this line, and press Return:
+
+    xattr -dr com.apple.quarantine "/Applications/Stage Chart.app"
+
+Then double-click Stage Chart again.
+
+
+USING IT
+--------
+* Open Stage Chart and click "Choose PDFs...". You can pick several charts at once.
+* Or drag chart PDFs onto the Stage Chart icon in the Dock or in Applications.
+* Each stage chart is saved next to its original, named like
+      "God of the Promise - Stage Chart - D (Light).pdf"
+  Click "Show in Finder" or "Open Chart" to see it.
+* The first time it saves into Downloads, Desktop or Documents, your Mac asks whether
+  Stage Chart may access that folder. Click "Allow".
+
+What it does to each chart:
+* Light colors: black lyrics, dark red chords, blue cues.
+* Two columns, 17pt lyrics. If the chart runs longer than the original, it tightens the
+  spacing to try to match the original's page count (the text stays 17pt).
+* Same key as the original. It never transposes.
+* Back-to-back repeated sections are shown once with "x2" (with each pass's cue).
+* Bridges and other sections that come back later are printed again, in order, with their cues.
+* Slash chords are written properly, for example D/F# (some PDFs drop the sharp).
+
+Worth knowing:
+* Always give a new chart a quick look before rehearsal. Chord placement is read from the
+  PDF's layout, so an unusual chart can put a chord a syllable early or late.
+* Scanned charts (a picture of a page, with no real text) can't be read.
+* Handwritten notes aren't added. Those still need to be added by hand.
+* If something goes wrong, details are written to ~/Library/Logs/Stage Chart.log
