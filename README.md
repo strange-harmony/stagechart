@@ -27,6 +27,7 @@ the PDF's layout, so give each new chart a quick look before rehearsal.
 | `tools/pil_stub/` | Empty stand-in for Pillow, which reportlab imports but Stage Chart never uses |
 | `tests/make_samples.py` | Makes synthetic MultiTracks- and SongSelect-style charts for testing |
 | `How to install.txt` | Install and usage notes for the Mac app |
+| `windows/` | The Windows app: window, launcher and build scripts (see below) |
 
 The built app is not kept in this repository.
 
@@ -73,3 +74,33 @@ pip install pdfminer.six reportlab
 Building the Mac app (`tools/build_app.py`) also needs conda-forge Python 3.12 + Tk runtimes for
 osx-arm64 and osx-64, the wheels listed at the top of that script, and `llvm-lipo` (or `lipo`).
 `tools/make_icon.py` and `tests/make_samples.py` need Pillow and the DejaVu/Carlito system fonts.
+
+## Windows app
+
+Uses the same `app/stagechart.py` engine and fonts, with its own window and packaging in `windows/`.
+
+| Path | What it is |
+| --- | --- |
+| `windows/app/gui_win.py` | The Windows window (Tk): drop PDFs on it, "Choose PDFs…", save next to the original or into one folder, Open Chart / Show in Folder, Options menu for shortcuts and the log |
+| `windows/app/sources.py` | Where charts come from. Today one source, local PDF files; a Planning Center source can be added here and shows up as a tab |
+| `windows/app/jobs.py` | Conversion queue on a worker thread, shared by every source |
+| `windows/app/settings.py` | Settings in `%APPDATA%\Stage Chart\settings.json` |
+| `windows/app/winplatform.py` | Explorer, default PDF viewer, Desktop / Start menu / Send to shortcuts, DPI awareness |
+| `windows/launcher/` | `Stage Chart.exe`: a small C launcher (with the icon) that starts the bundled `pythonw.exe` |
+| `windows/fetch_windows_deps.py` | Downloads conda-forge Python 3.12 + Tk 8.6 for win-64 and the win_amd64 wheels |
+| `windows/build_windows.py` | Assembles the `Stage Chart` folder and `Stage Chart for Windows.zip` |
+| `windows/How to install.txt` | Install and usage notes shipped in the zip |
+
+Users get a zip with a `Stage Chart` folder (`Stage Chart.exe`, `app\`, `runtime\`). No installer, no admin rights.
+Files dropped on the window or the .exe, or sent with right-click > Send to > Stage Chart, are converted.
+Errors go to `%LOCALAPPDATA%\Stage Chart\Stage Chart.log`.
+
+Build on Linux (needs `gcc-mingw-w64-x86-64`, Pillow, `zstandard`, and `python3.12` to precompile):
+
+```sh
+python3 windows/fetch_windows_deps.py /tmp/win
+python3 windows/build_windows.py /tmp/win/runtime /tmp/win/wheels /tmp/win/out "/tmp/win/out/Stage Chart for Windows.zip"
+```
+
+Tested under Wine (launcher, window, drag-and-drop library, conversion output identical to Linux), not yet on
+a real Windows PC. The .exe isn't code-signed, so SmartScreen asks once (More info > Run anyway).
