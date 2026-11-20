@@ -68,6 +68,15 @@ def run_dialogs(files):
         subprocess.run(["open", "-R", outs[-1]])
 
 
+def about(root):
+    from tkinter import messagebox
+    from version import VERSION
+    messagebox.showinfo("About Stage Chart",
+                        f"Stage Chart {VERSION}\n\nLight mode, two columns, 17pt lyrics, original key, page count "
+                        "matched where possible, repeats shown once with ×2, bridges printed in order with cues, "
+                        "slash chords like D/F#.\n\nFont: Carlito (SIL Open Font License).", parent=root)
+
+
 # --------------------------------------------------------------------------------------------
 # Tk window
 # --------------------------------------------------------------------------------------------
@@ -92,6 +101,7 @@ def run_window(initial):
              font=body, bg="#f5f5f7", fg="#515154", justify="center").pack(pady=(0, 10))
 
     last = {"out": None}
+    busy = {"n": 0}
     btns = tk.Frame(root, bg="#f5f5f7")
     btns.pack(pady=4)
 
@@ -146,9 +156,13 @@ def run_window(initial):
             return
 
         def work():
-            for p in pdfs:
-                events.put((say, (f"Converting {os.path.basename(p)} …",)))
-                events.put((finished, convert_one(p)))
+            busy["n"] += 1
+            try:
+                for p in pdfs:
+                    events.put((say, (f"Converting {os.path.basename(p)} …",)))
+                    events.put((finished, convert_one(p)))
+            finally:
+                busy["n"] -= 1
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -171,6 +185,22 @@ def run_window(initial):
         root.createcommand("tk::mac::Quit", root.destroy)
     except Exception:
         pass
+
+    # updates: "Check for Updates…" in the Stage Chart menu, plus a quiet check once a day
+    try:
+        import update_ui
+        upd = update_ui.UpdateUI(root, say=say, log_path=LOG, log_error=log_error,
+                                 busy=lambda: busy["n"] > 0, quit=root.destroy)
+        menubar = tk.Menu(root)
+        app_menu = tk.Menu(menubar, name="apple", tearoff=0)
+        app_menu.add_command(label="About Stage Chart", command=lambda: about(root))
+        app_menu.add_command(label="Check for Updates…", command=upd.check_now)
+        app_menu.add_separator()
+        menubar.add_cascade(menu=app_menu)
+        root.config(menu=menubar)
+        upd.start()
+    except Exception:
+        log_error("updates unavailable:\n" + traceback.format_exc())
 
     root.after(100, pump)
     if initial:

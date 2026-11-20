@@ -21,11 +21,18 @@ the PDF's layout, so give each new chart a quick look before rehearsal.
 | --- | --- |
 | `app/stagechart.py` | The engine and command line tool |
 | `app/gui.py` | The Mac window (Tk): "Choose PDFs…", drag onto the Dock icon |
+| `app/version.py` | The app's version (the release workflow sets it) |
+| `app/updater.py` | Updates: checks GitHub Releases, downloads, verifies and swaps in the new app (Mac and Windows) |
+| `app/update_ui.py` | The "Update available" window, shared by both apps |
 | `app/fonts/` | Bundled Carlito font (SIL Open Font License, see `Carlito-LICENSE.txt`) |
+| `tools/fetch_mac_deps.py` | Downloads conda-forge Python 3.12 + Tk for both Mac architectures and the wheels |
 | `tools/build_app.py` | Builds the universal (Apple silicon + Intel) `Stage Chart.app` |
 | `tools/make_icon.py` | Draws the app icon and writes `AppIcon.icns` |
 | `tools/pil_stub/` | Empty stand-in for Pillow, which reportlab imports but Stage Chart never uses |
 | `tests/make_samples.py` | Makes synthetic MultiTracks- and SongSelect-style charts for testing |
+| `tests/test_updater.py` | Updater tests that run anywhere (`python3 -m unittest tests/test_updater.py`) |
+| `tests/smoke_installed.py` | Tests a built app on a real Mac or Windows PC, including a full update and restart |
+| `.github/workflows/release.yml` | Builds both apps, tests them on GitHub's Mac and Windows machines, publishes releases |
 | `How to install.txt` | Install and usage notes for the Mac app |
 | `windows/` | The Windows app: window, launcher and build scripts (see below) |
 
@@ -104,3 +111,29 @@ python3 windows/build_windows.py /tmp/win/runtime /tmp/win/wheels /tmp/win/out "
 
 Tested under Wine (launcher, window, drag-and-drop library, conversion output identical to Linux), not yet on
 a real Windows PC. The .exe isn't code-signed, so SmartScreen asks once (More info > Run anyway).
+
+## Updates and releases
+
+Both apps check GitHub once a day for a newer release (and on demand: Stage Chart menu > Check for Updates
+on the Mac, Help > Check for Updates on Windows). When there is one, they show what's new and offer
+"Install and Restart": the zip is downloaded, checked against GitHub's SHA-256, unpacked next to the app,
+and a small helper (`/bin/sh` on the Mac, PowerShell on Windows) waits for the app to quit, moves the old
+app aside, moves the new one in (putting the old one back if anything fails) and opens Stage Chart again.
+Settings and the save folder are kept. Windows can turn the daily check off under Options.
+
+The apps read releases from this repository without signing in, so the repository must be public.
+
+To publish an update: on GitHub, open Actions > Build and release > Run workflow, enter the new version
+(higher than the last one, for example `1.1.0`) and a short "what's new". The workflow builds both apps,
+tests them on a real Mac and Windows PC (convert sample charts, start Tk, reach GitHub, install an update and
+restart), and only then publishes release `v1.1.0` with `StageChart-mac.zip` and `StageChart-windows.zip`.
+Pull requests run the same build and tests without publishing.
+
+Copies installed before version 1.0.0 had no updater, so they need one last manual install.
+
+Building the Mac app locally:
+
+```sh
+python3 tools/fetch_mac_deps.py /tmp/mac
+python3 tools/build_app.py /tmp/mac/runtime-arm64 /tmp/mac/runtime-x86_64 /tmp/mac/wheels /tmp/mac/out /tmp/mac/StageChart-mac.zip
+```

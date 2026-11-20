@@ -20,7 +20,8 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIPO = shutil.which("lipo") or shutil.which("llvm-lipo") or shutil.which("llvm-lipo-18")
-VERSION = "1.0"
+sys.path.insert(0, os.path.join(ROOT, "app"))
+from version import VERSION  # noqa: E402  (the release workflow sets it)
 
 DROP_DYLIBS = ("libpython", "libncurses", "libtinfo", "libform", "libmenu", "libpanel", "libreadline",
                "libhistory", "libsqlite")

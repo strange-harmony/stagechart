@@ -29,7 +29,7 @@ WINDRES = "x86_64-w64-mingw32-windres"
 ROOT_FILES = ("python.exe", "pythonw.exe", "python3.dll", "python312.dll", "vcruntime140.dll",
               "vcruntime140_1.dll", "LICENSE_PYTHON.txt")
 LIB_BIN = ("ffi-8.dll", "libbz2.dll", "libcrypto-3-x64.dll", "libssl-3-x64.dll", "libexpat.dll", "liblzma.dll",
-           "sqlite3.dll", "tcl86t.dll", "tk86t.dll", "zlib.dll")
+           "sqlite3.dll", "tcl86t.dll", "tk86t.dll", "zlib.dll", "zlib1.dll")   # tcl86t.dll needs zlib1.dll
 DROP_PYD = ("_test", "xxlimited", "_ctypes_test", "_msi")
 DROP_STDLIB = {"test", "idlelib", "ensurepip", "lib2to3", "turtledemo", "pydoc_data", "venv", "site-packages",
                "tkinter/test", "sqlite3/test", "ctypes/test", "unittest/test"}
@@ -81,6 +81,8 @@ def copy_runtime(src, dst):
 def copy_app(wheels, dst, ico):
     os.makedirs(dst)
     shutil.copy2(os.path.join(ROOT, "app", "stagechart.py"), dst)      # the shared engine, unchanged
+    for f in ("version.py", "updater.py", "update_ui.py"):                # shared update code
+        shutil.copy2(os.path.join(ROOT, "app", f), dst)
     shutil.copytree(os.path.join(ROOT, "app", "fonts"), os.path.join(dst, "fonts"))
     for f in glob.glob(os.path.join(WIN, "app", "*.py")):
         shutil.copy2(f, dst)
@@ -115,6 +117,47 @@ def precompile(paths):
                          "-x", r"[\\/](test|tests|lib2to3)[\\/]", p])
 
 
+# DLLs every Windows 10/11 PC has; anything else a bundled DLL imports must be in the bundle.
+SYSTEM_DLLS = {
+    "kernel32", "user32", "gdi32", "advapi32", "shell32", "ole32", "oleaut32", "comctl32", "comdlg32", "imm32",
+    "ws2_32", "bcrypt", "bcryptprimitives", "crypt32", "version", "winmm", "propsys", "rpcrt4", "iphlpapi",
+    "netapi32", "userenv", "ntdll", "msvcrt", "shlwapi", "uxtheme", "secur32", "dwmapi", "setupapi", "winspool",
+    "mswsock", "psapi", "dbghelp", "cabinet", "msi", "wtsapi32", "pathcch", "ucrtbase", "powrprof", "cfgmgr32",
+}
+OBJDUMP = "x86_64-w64-mingw32-objdump"
+
+
+def check_imports(folder):
+    """Fail the build if a bundled .exe/.dll/.pyd needs a DLL that is neither bundled nor part of Windows.
+
+    Wine provides some DLLs (zlib1.dll, for one) that a real PC doesn't, so a Wine test can't catch this.
+    """
+    if not shutil.which(OBJDUMP):
+        print("objdump not found: skipping the DLL import check")
+        return
+    pe, have = [], set()
+    for dirpath, dirs, files in os.walk(folder):
+        for f in files:
+            if f.lower().endswith((".dll", ".pyd", ".exe")):
+                pe.append(os.path.join(dirpath, f))
+                if f.lower().endswith(".dll"):
+                    have.add(f.lower())
+    missing = {}
+    for p in pe:
+        out = subprocess.run([OBJDUMP, "-p", p], capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            if "DLL Name:" in line:
+                dll = line.split("DLL Name:")[1].strip().lower()
+                stem = dll[:-4] if dll.endswith(".dll") else dll
+                if dll in have or stem in SYSTEM_DLLS or dll.startswith(("api-ms-win-", "ext-ms-")):
+                    continue
+                missing.setdefault(dll, []).append(os.path.relpath(p, folder))
+    if missing:
+        raise SystemExit("Missing DLLs in the bundle:\n" +
+                         "\n".join(f"  {d} (needed by {', '.join(v[:3])})" for d, v in sorted(missing.items())))
+    print(f"DLL import check: {len(pe)} files OK")
+
+
 def zip_dir(folder, zpath):
     if os.path.exists(zpath):
         os.remove(zpath)
@@ -138,6 +181,7 @@ def build(runtime, wheels, out_dir):
     build_launcher(os.path.join(folder, "Stage Chart.exe"), ico)
     shutil.copy2(os.path.join(WIN, "How to install.txt"), os.path.join(folder, "How to install.txt"))
     precompile([os.path.join(folder, "runtime", "Lib"), os.path.join(folder, "app")])
+    check_imports(folder)
     os.remove(ico)
     return folder
 
