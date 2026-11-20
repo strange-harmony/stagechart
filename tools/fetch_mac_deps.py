@@ -25,8 +25,10 @@ PYTHON = "3.12"
 RUNTIME = {"python": PYTHON + ".", "tk": "8.6.", "bzip2": None, "libexpat": None, "libffi": "3.",
            "liblzma": None, "libzlib": None, "openssl": "3."}
 # --no-deps: Pillow must stay out (tools/pil_stub stands in for it). certifi gives the bundled
-# Python the root certificates it needs to reach GitHub for updates.
-WHEELS = ["pdfminer.six", "reportlab", "charset-normalizer", "cryptography", "pycparser", "certifi"]
+# Python the root certificates it needs to reach GitHub (updates) and Planning Center. pypdf joins a
+# set's charts into one PDF; tkinterdnd2 lets PDFs be dropped on the window itself.
+WHEELS = ["pdfminer.six", "reportlab", "charset-normalizer", "cryptography", "pycparser", "certifi", "pypdf",
+          "tkinterdnd2"]
 CFFI = {"arm64": "macosx_11_0_arm64", "x86_64": "macosx_10_9_x86_64"}
 
 

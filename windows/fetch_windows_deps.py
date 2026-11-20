@@ -3,7 +3,7 @@
   python3 windows/fetch_windows_deps.py WORK_DIR
 
 Makes WORK_DIR/runtime (conda-forge Python 3.12 + Tk 8.6 for win-64, unpacked) and WORK_DIR/wheels
-(win_amd64 wheels for pdfminer.six, reportlab, tkinterdnd2 and their dependencies).
+(win_amd64 wheels for pdfminer.six, reportlab, tkinterdnd2, pypdf and their dependencies).
 Needs the 'zstandard' module (pip install zstandard) to unpack .conda packages.
 """
 import io
@@ -21,7 +21,7 @@ PYTHON = "3.12"
 RUNTIME = {"python": PYTHON + ".", "libpython": PYTHON + ".", "tk": "8.6.", "bzip2": None, "libexpat": None,
            "libffi": "3.", "liblzma": None, "libsqlite": None, "libzlib": None, "openssl": "3.",
            "vc14_runtime": None}
-WHEELS = ["pdfminer.six", "reportlab", "tkinterdnd2"]
+WHEELS = ["pdfminer.six", "reportlab", "tkinterdnd2", "pypdf"]   # pypdf: one PDF per set
 
 
 def fetch(url):

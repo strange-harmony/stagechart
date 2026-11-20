@@ -5,7 +5,7 @@ Run on Linux (or Windows with MSYS2 mingw-w64):
   python3 windows/build_windows.py WORK/runtime WORK/wheels OUT_DIR [ZIP_PATH]
 
 Needs x86_64-w64-mingw32-gcc and x86_64-w64-mingw32-windres (Ubuntu: apt install gcc-mingw-w64-x86-64),
-Pillow (for the icon), and optionally python3.12 on PATH to precompile the Python files.
+and optionally python3.12 on PATH to precompile the Python files.
 
 Result:
   Stage Chart/
@@ -38,9 +38,7 @@ DROP_TCL = ("tk8.6/demos", "tk8.6/images", "tcl8.6/tzdata")
 
 
 def make_icon(dst):
-    from PIL import Image
-    im = Image.open(os.path.join(ROOT, "tools", "AppIcon-preview.png")).convert("RGBA")
-    im.save(dst, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    shutil.copy2(os.path.join(ROOT, "tools", "AppIcon.ico"), dst)       # drawn by tools/make_icon.py
 
 
 def build_launcher(out_exe, ico):
@@ -80,9 +78,9 @@ def copy_runtime(src, dst):
 
 def copy_app(wheels, dst, ico):
     os.makedirs(dst)
-    shutil.copy2(os.path.join(ROOT, "app", "stagechart.py"), dst)      # the shared engine, unchanged
-    for f in ("version.py", "updater.py", "update_ui.py"):                # shared update code
-        shutil.copy2(os.path.join(ROOT, "app", f), dst)
+    for f in glob.glob(os.path.join(ROOT, "app", "*.py")):                # the engine, window and shared code
+        if os.path.basename(f) != "gui.py":                               # (gui.py starts the Mac app)
+            shutil.copy2(f, dst)
     shutil.copytree(os.path.join(ROOT, "app", "fonts"), os.path.join(dst, "fonts"))
     for f in glob.glob(os.path.join(WIN, "app", "*.py")):
         shutil.copy2(f, dst)
@@ -101,8 +99,9 @@ def copy_app(wheels, dst, ico):
     dnd = os.path.join(vendor, "tkinterdnd2", "tkdnd")
     if os.path.isdir(dnd):                    # keep only the Windows builds of tkdnd
         for d in os.listdir(dnd):
-            if os.path.isdir(os.path.join(dnd, d)) and not d.startswith("win-"):
+            if os.path.isdir(os.path.join(dnd, d)) and d not in ("win-x64", "win-arm64"):
                 shutil.rmtree(os.path.join(dnd, d))
+    shutil.rmtree(os.path.join(vendor, "tkinterdnd2", "__pyinstaller"), ignore_errors=True)
     for p in glob.glob(os.path.join(vendor, "**", "__pycache__"), recursive=True):
         shutil.rmtree(p, ignore_errors=True)
 

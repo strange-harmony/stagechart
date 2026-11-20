@@ -7,7 +7,10 @@ INSTALL is the installed app: ".../Stage Chart.app" on a Mac, or the "Stage Char
   1. it converts the sample PDFs (tests/make_samples.py) into stage charts,
   2. Tk starts (the window toolkit),
   3. it can reach GitHub over HTTPS (needed for update checks),
-  4. an update really installs: a copy of the app marked 99.0.0 is zipped like a release, the installed
+  4. the window opens and works: a dropped PDF and a whole (fake) Planning Center set are converted, the
+     set is put together in one PDF, and the Planning Center token store (keychain / Credential Manager)
+     keeps and forgets a token (tests/window_check.py),
+  5. an update really installs: a copy of the app marked 99.0.0 is zipped like a release, the installed
      app's own updater unpacks it and starts the swap helper, and the test waits until the installed copy
      says 99.0.0 and the helper has started it again.
 The installed copy is changed by step 4, so run this on a throwaway copy.
@@ -78,6 +81,17 @@ def tk_starts(install):
 def https_works(install):
     run_py(install, "import updater; r = updater._open('https://api.github.com/rate_limit'); "
                     "print('GitHub HTTPS', r.status)")
+
+
+def window_works(install, samples):
+    tests = os.path.dirname(os.path.abspath(__file__))
+    sample = sorted(glob.glob(os.path.join(samples, "God*.pdf")) or glob.glob(os.path.join(samples, "*.pdf")))[0]
+    out = run_py(install, f"sys.path.insert(0, {tests!r}); import window_check; window_check.check(sys.argv[1])",
+                 sample)
+    if "window check: all good" not in out:
+        raise SystemExit("FAILED: window check")
+    if not IS_MAC and "drag and drop: on" not in out:
+        raise SystemExit("FAILED: drag and drop didn't load in the Windows app")
 
 
 def make_release_zip(install, dest_zip):
@@ -182,7 +196,9 @@ def main(install, samples):
     tk_starts(install)
     step(3, "reach GitHub over HTTPS")
     https_works(install)
-    step(4, "install an update and restart")
+    step(4, "open the window, convert a dropped PDF and a whole Planning Center set")
+    window_works(install, samples)
+    step(5, "install an update and restart")
     update_installs(install)
     print("\nALL OK")
 

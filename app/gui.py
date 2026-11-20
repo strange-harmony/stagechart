@@ -1,9 +1,11 @@
-"""Stage Chart window: pick (or drop) chord chart PDFs and save stage charts next to them."""
+"""Stage Chart for Mac. The window itself (layout B2) is window.py, shared with the Windows app.
+
+Started by the app bundle as:  python3.12 app/gui.py [files...]  (files dropped on the Dock icon arrive as
+an "open documents" event too). If Tk can't start, it falls back to plain macOS dialogs.
+"""
 import os
-import queue
 import subprocess
 import sys
-import threading
 import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -68,146 +70,66 @@ def run_dialogs(files):
         subprocess.run(["open", "-R", outs[-1]])
 
 
-def about(root):
-    from tkinter import messagebox
-    from version import VERSION
-    messagebox.showinfo("About Stage Chart",
-                        f"Stage Chart {VERSION}\n\nLight mode, two columns, 17pt lyrics, original key, page count "
-                        "matched where possible, repeats shown once with ×2, bridges printed in order with cues, "
-                        "slash chords like D/F#.\n\nFont: Carlito (SIL Open Font License).", parent=root)
+class MacPlatform:
+    name = "mac"
+    file_manager = "Finder"
 
+    def __init__(self):
+        self.log_error = log_error
+        self.log_path = LOG
 
-# --------------------------------------------------------------------------------------------
-# Tk window
-# --------------------------------------------------------------------------------------------
-def run_window(initial):
-    import tkinter as tk
-    from tkinter import filedialog, font
-
-    root = tk.Tk()
-    root.title("Stage Chart")
-    root.geometry("560x430")
-    root.minsize(460, 340)
-    root.configure(bg="#f5f5f7")
-
-    big = font.Font(family="Helvetica", size=20, weight="bold")
-    body = font.Font(family="Helvetica", size=13)
-    small = font.Font(family="Helvetica", size=12)
-
-    tk.Label(root, text="Stage Chart", font=big, bg="#f5f5f7", fg="#1d1d1f").pack(pady=(18, 2))
-    tk.Label(root, text="Turns a chord chart PDF into a light, two-column, 17pt stage chart.\n"
-                        "The stage chart is saved in the same folder as the original.\n"
-                        "The original PDF is never changed.",
-             font=body, bg="#f5f5f7", fg="#515154", justify="center").pack(pady=(0, 10))
-
-    last = {"out": None}
-    busy = {"n": 0}
-    btns = tk.Frame(root, bg="#f5f5f7")
-    btns.pack(pady=4)
-
-    logbox = tk.Text(root, height=10, wrap="word", font=small, relief="flat", bg="white", fg="#1d1d1f",
-                     padx=10, pady=8, highlightthickness=1, highlightbackground="#d2d2d7")
-    logbox.pack(fill="both", expand=True, padx=18, pady=(8, 6))
-    logbox.tag_configure("ok", foreground="#1a7f37")
-    logbox.tag_configure("bad", foreground="#c62828")
-    logbox.insert("end", "Click Choose PDFs, or drop PDFs onto the Stage Chart icon in the Dock.\n")
-    logbox.configure(state="disabled")
-
-    def say(text, tag=None):
-        logbox.configure(state="normal")
-        logbox.insert("end", text + "\n", tag)
-        logbox.see("end")
-        logbox.configure(state="disabled")
-
-    show_btn = tk.Button(btns, text="Show in Finder", font=body, state="disabled",
-                         command=lambda: last["out"] and subprocess.run(["open", "-R", last["out"]]))
-    open_btn = tk.Button(btns, text="Open Chart", font=body, state="disabled",
-                         command=lambda: last["out"] and subprocess.run(["open", last["out"]]))
-
-    events = queue.Queue()      # worker thread -> window (Tk is only touched on the main thread)
-
-    def pump():
+    def make_root(self):
+        import tkinter as tk
         try:
-            while True:
-                fn, args = events.get_nowait()
-                fn(*args)
-        except queue.Empty:
+            from tkinterdnd2 import DND_FILES, TkinterDnD
+            return TkinterDnD.Tk(), DND_FILES
+        except Exception:
+            log_error("in-window drag and drop unavailable (Dock drops still work):\n" + traceback.format_exc())
+            return tk.Tk(), None
+
+    def open_file(self, path):
+        subprocess.run(["open", path])
+
+    def show_in_folder(self, path):
+        subprocess.run(["open", "-R", path])
+
+    def setup(self, win):
+        import tkinter as tk
+        import window
+        root = win.root
+        # files dropped on the app or Dock icon arrive as an "open documents" event
+        try:
+            root.createcommand("::tk::mac::OpenDocument", lambda *args: win.submit(list(args)))
+        except Exception:
             pass
-        root.after(100, pump)
-
-    def finished(ok, out, summary):
-        if ok:
-            say(f"✓ Saved “{os.path.basename(out)}”", "ok")
-            for s in summary:
-                say("    " + s)
-            last["out"] = out
-            show_btn.configure(state="normal")
-            open_btn.configure(state="normal")
-        else:
-            for s in summary:
-                say("✗ " + s, "bad")
-
-    def process(paths):
-        pdfs = [p for p in paths if p.lower().endswith(".pdf")]
-        for p in paths:
-            if p not in pdfs:
-                say(f"✗ {os.path.basename(p)}: only PDF files can be converted.", "bad")
-        if not pdfs:
-            return
-
-        def work():
-            busy["n"] += 1
-            try:
-                for p in pdfs:
-                    events.put((say, (f"Converting {os.path.basename(p)} …",)))
-                    events.put((finished, convert_one(p)))
-            finally:
-                busy["n"] -= 1
-
-        threading.Thread(target=work, daemon=True).start()
-
-    def choose():
-        paths = filedialog.askopenfilenames(title="Choose chord chart PDFs",
-                                            filetypes=[("PDF files", "*.pdf"), ("PDF files", "*.PDF")])
-        if paths:
-            process(list(paths))
-
-    tk.Button(btns, text="Choose PDFs…", font=body, command=choose, default="active").pack(side="left", padx=4)
-    show_btn.pack(side="left", padx=4)
-    open_btn.pack(side="left", padx=4)
-
-    # files dropped on the app or Dock icon arrive as an "open documents" event
-    try:
-        root.createcommand("::tk::mac::OpenDocument", lambda *args: process(list(args)))
-    except Exception:
-        pass
-    try:
-        root.createcommand("tk::mac::Quit", root.destroy)
-    except Exception:
-        pass
-
-    # updates: "Check for Updates…" in the Stage Chart menu, plus a quiet check once a day
-    try:
-        import update_ui
-        upd = update_ui.UpdateUI(root, say=say, log_path=LOG, log_error=log_error,
-                                 busy=lambda: busy["n"] > 0, quit=root.destroy)
+        try:
+            root.createcommand("tk::mac::Quit", root.destroy)
+            root.createcommand("tk::mac::ShowPreferences", win.open_settings)
+        except Exception:
+            pass
+        window.start_updates(win)
         menubar = tk.Menu(root)
         app_menu = tk.Menu(menubar, name="apple", tearoff=0)
-        app_menu.add_command(label="About Stage Chart", command=lambda: about(root))
-        app_menu.add_command(label="Check for Updates…", command=upd.check_now)
+        app_menu.add_command(label="About Stage Chart", command=win.open_about)
+        app_menu.add_command(label="Check for Updates…", command=lambda: win.updates and win.updates.check_now())
         app_menu.add_separator()
         menubar.add_cascade(menu=app_menu)
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Choose PDFs…", accelerator="Command-O", command=win.choose_files)
+        menubar.add_cascade(label="File", menu=file_menu)
+        root.bind_all("<Command-o>", lambda e: win.choose_files())
         root.config(menu=menubar)
-        upd.start()
-    except Exception:
-        log_error("updates unavailable:\n" + traceback.format_exc())
 
-    root.after(100, pump)
-    if initial:
-        root.after(200, lambda: process(initial))
-    root.lift()
-    root.after(300, lambda: root.attributes("-topmost", False))
-    root.mainloop()
+    def settings_extras(self, win, dialog):
+        pass
+
+    def first_run(self, win):
+        pass
+
+
+def run_window(initial):
+    import window
+    window.StageChartWindow(MacPlatform(), initial).run()
 
 
 def main():
