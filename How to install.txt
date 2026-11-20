@@ -28,11 +28,22 @@ Then double-click Stage Chart again.
 
 USING IT
 --------
-* Open Stage Chart and click "Choose PDFs...". You can pick several charts at once.
+* Drag chart PDFs onto the Stage Chart window, or click "Choose PDFs...". Several at once is fine.
 * Or drag chart PDFs onto the Stage Chart icon in the Dock or in Applications.
 * Each stage chart is saved next to its original, named like
       "God of the Promise - Stage Chart - D (Light).pdf"
-  Click "Show in Finder" or "Open Chart" to see it.
+  (Settings can save them all in one folder instead.) Each one shows in "This batch" with an
+  Open button, and the newest one is previewed under "Last finished".
+
+PLANNING CENTER
+* Click "Get started", then "Get a personal access token". On that Planning Center page, make a
+  Personal Access Token and paste its Application ID and Secret into Stage Chart. It's kept in your
+  Mac's keychain, and Stage Chart only reads from Planning Center.
+* The card shows your next service. Pick another date on the calendar to choose a different plan.
+* "Convert this set" makes a stage chart for every song, using the chart for the key each song is
+  scheduled in. Charts are never transposed: if the chart is in another key, the row says "Check key".
+* Sets are saved in Documents > Stage Charts, one folder per plan, with the songs numbered in order
+  and one "Whole Set" PDF with all of them.
 * The first time it saves into Downloads, Desktop or Documents, your Mac asks whether
   Stage Chart may access that folder. Click "Allow".
 

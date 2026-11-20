@@ -33,8 +33,8 @@ jobs:
       - name: Tools
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q gcc-mingw-w64-x86-64 llvm fonts-dejavu-core
-          python -m pip install -q zstandard pillow reportlab pdfminer.six
+          sudo apt-get install -y -q gcc-mingw-w64-x86-64 llvm fonts-dejavu-core xvfb
+          python -m pip install -q zstandard pillow reportlab pdfminer.six pypdf tkinterdnd2
           sudo ln -sf "$(ls /usr/bin/llvm-lipo* | head -1)" /usr/local/bin/llvm-lipo
       - name: Set version
         if: github.event_name == 'workflow_dispatch'
@@ -51,8 +51,8 @@ jobs:
           open(p, "w").write(re.sub(r'VERSION = "[^"]*"', f'VERSION = "{v}"', s))
           print("version", v)
           PY
-      - name: Unit tests
-        run: python -m unittest tests/test_updater.py -v
+      - name: Unit tests (updater, Planning Center, and the window under a virtual display)
+        run: xvfb-run -a python -m unittest tests/test_updater.py tests/test_pco.py tests/test_window.py -v
       - name: Build Mac app
         run: |
           mkdir -p dist

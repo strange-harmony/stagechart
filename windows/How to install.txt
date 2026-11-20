@@ -22,7 +22,7 @@ INSTALL (one time, about 2 minutes)
    "Send to" menu. Click "Yes" (recommended).
 
 Keep "Stage Chart.exe" in its folder next to "app" and "runtime". Use the shortcuts to start it.
-If you move the folder later, choose Options > Add shortcuts again.
+If you move the folder later, open Settings and click "Add shortcuts" again.
 
 
 USING IT
@@ -33,8 +33,19 @@ USING IT
 * Or drag PDFs onto the Stage Chart icon on your Desktop.
 * By default each stage chart is saved next to its original, named like
       "God of the Promise - Stage Chart - D (Light).pdf"
-  To collect them in one folder instead, choose "In this folder" and pick the folder.
-* Click "Open Chart" or "Show in Folder" to see the newest one.
+  To collect them in one folder instead, open Settings and choose a folder.
+* Each one shows in "This batch" with an Open button, and the newest one is previewed under
+  "Last finished".
+
+PLANNING CENTER
+* Click "Get started", then "Get a personal access token". On that Planning Center page, make a
+  Personal Access Token and paste its Application ID and Secret into Stage Chart. It's kept in
+  Windows Credential Manager, and Stage Chart only reads from Planning Center.
+* The card shows your next service. Pick another date on the calendar to choose a different plan.
+* "Convert this set" makes a stage chart for every song, using the chart for the key each song is
+  scheduled in. Charts are never transposed: if the chart is in another key, the row says "Check key".
+* Sets are saved in Documents\Stage Charts, one folder per plan, with the songs numbered in order
+  and one "Whole Set" PDF with all of them.
 
 What it does to each chart:
 * Light colors: black lyrics, dark red chords, blue cues.
@@ -50,8 +61,8 @@ Worth knowing:
   PDF's layout, so an unusual chart can put a chord a syllable early or late.
 * Scanned charts (a picture of a page, with no real text) can't be read.
 * Updates: Stage Chart checks for a new version once a day. When there is one, click
-  "Install and Restart". You can also choose Help > Check for Updates... at any time.
+  "Install and Restart". You can also open Settings and click "Check now" at any time.
 * Handwritten notes aren't added. Those still need to be added by hand.
-* If something goes wrong, choose Options > Open log folder. The details are in
+* If something goes wrong, open Settings and click "Open the log folder". The details are in
   "Stage Chart.log" (in %LOCALAPPDATA%\Stage Chart).
-* To uninstall: Options > Remove shortcuts, then delete the "Stage Chart" folder.
+* To uninstall: Settings > Remove shortcuts, then delete the "Stage Chart" folder.

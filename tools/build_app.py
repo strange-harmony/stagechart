@@ -133,6 +133,12 @@ def build(rt_arm, rt_x86, wheels, out_dir):
     shutil.copytree(stub, os.path.join(res_app, "vendor", "PIL"))
     shutil.rmtree(os.path.join(res_app, "vendor", "reportlab", "fonts"), ignore_errors=True)
     os.makedirs(os.path.join(res_app, "vendor", "reportlab", "fonts"))
+    dnd = os.path.join(res_app, "vendor", "tkinterdnd2", "tkdnd")
+    if os.path.isdir(dnd):                    # keep only the Mac builds of tkdnd (Tk 8.6, both chips)
+        for d in os.listdir(dnd):
+            if os.path.isdir(os.path.join(dnd, d)) and d not in ("osx-arm64", "osx-x64"):
+                shutil.rmtree(os.path.join(dnd, d))
+    shutil.rmtree(os.path.join(res_app, "vendor", "tkinterdnd2", "__pyinstaller"), ignore_errors=True)
 
     # ---- launcher
     launcher = os.path.join(C, "MacOS", "StageChart")

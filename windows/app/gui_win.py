@@ -1,4 +1,4 @@
-"""Stage Chart for Windows: pick or drop chord chart PDFs and save stage charts.
+"""Stage Chart for Windows. The window itself (layout B2) is window.py, shared with the Mac app.
 
 Started by "Stage Chart.exe" as:  runtime\\pythonw.exe -B -E -s app\\gui_win.py [files...]
 Files dropped on the .exe or sent with right-click > Send to > Stage Chart arrive as arguments.
@@ -11,10 +11,11 @@ import traceback
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "vendor"))
 sys.path.insert(0, HERE)
-# Running from the repository (windows/app/gui_win.py): the shared engine is in ../../app
+# Running from the repository (windows/app/gui_win.py): the shared code is in ../../app
 _repo_app = os.path.join(os.path.dirname(os.path.dirname(HERE)), "app")
 if not os.path.exists(os.path.join(HERE, "stagechart.py")) and os.path.isdir(_repo_app):
     sys.path.insert(1, _repo_app)
+    sys.path.insert(2, os.path.join(_repo_app, "vendor"))
 
 # Bundled Tcl/Tk lives in runtime\tcl; point Tk at it before tkinter loads.
 _rt = os.path.dirname(os.path.abspath(sys.executable))
@@ -23,10 +24,9 @@ for _var, _sub in (("TCL_LIBRARY", "tcl8.6"), ("TK_LIBRARY", "tk8.6")):
     if os.path.isdir(_p):
         os.environ[_var] = _p
 
-import jobs  # noqa: E402
 import settings as settings_mod  # noqa: E402
 import winplatform as wp  # noqa: E402
-from version import VERSION  # noqa: E402
+
 LOG = os.path.join(settings_mod.log_dir(), "Stage Chart.log")
 
 
@@ -39,321 +39,87 @@ def log_error(text):
         pass
 
 
-class StageChartWindow:
-    colors = {"bg": "#f5f5f7", "text": "#1d1d1f", "muted": "#515154", "ok": "#1a7f37", "bad": "#c62828",
-              "drop": "#ffffff", "drop_border": "#c7c7cc", "drop_hot": "#e8f0fe", "drop_hot_border": "#2f6fdf"}
+class WindowsPlatform:
+    name = "windows"
+    file_manager = "File Explorer"
 
-    def __init__(self, initial_files):
+    def __init__(self):
+        self.log_error = log_error
+        self.log_path = LOG
+
+    def make_root(self):
         import tkinter as tk
-        from tkinter import font, ttk
-
-        from sources import SOURCES
-
-        self.tk = tk
-        self.settings = settings_mod.Settings()
-        self.last_out = None
-        self.pending = 0
-        self.dnd_ok = False
-        self._dnd_files = None
-
         try:
             from tkinterdnd2 import DND_FILES, TkinterDnD
-            self.root = TkinterDnD.Tk()
-            self._dnd_files = DND_FILES
-            self.dnd_ok = True
+            return TkinterDnD.Tk(), DND_FILES
         except Exception:
             log_error("Drag and drop unavailable:\n" + traceback.format_exc())
-            self.root = tk.Tk()
-        root = self.root
-        root.title("Stage Chart")
-        root.geometry("620x560")
-        root.minsize(520, 460)
-        root.configure(bg=self.colors["bg"])
+            return tk.Tk(), None
+
+    def open_file(self, path):
+        wp.open_file(path)
+
+    def show_in_folder(self, path):
+        wp.show_in_folder(path)
+
+    def setup(self, win):
+        import window
         ico = os.path.join(HERE, "StageChart.ico")
         if os.path.exists(ico) and wp.IS_WIN:
             try:
-                root.iconbitmap(default=ico)
+                win.root.iconbitmap(default=ico)
             except Exception:
                 pass
+        win.root.bind_all("<Control-o>", lambda e: win.choose_files())
+        win.root.bind_all("<Control-comma>", lambda e: win.open_settings())
+        win.root.bind_all("<F1>", lambda e: win.open_about())
+        window.start_updates(win)
 
-        family = "Segoe UI" if wp.IS_WIN else "DejaVu Sans"
-        self.fonts = {"title": font.Font(family=family, size=18, weight="bold"),
-                      "body": font.Font(family=family, size=10),
-                      "drop": font.Font(family=family, size=12),
-                      "log": font.Font(family=family, size=10)}
-        style = ttk.Style(root)
-        if "vista" in style.theme_names():
-            style.theme_use("vista")
-        style.configure("TFrame", background=self.colors["bg"])
-        style.configure("TLabel", background=self.colors["bg"], foreground=self.colors["text"],
-                        font=self.fonts["body"])
-        style.configure("TRadiobutton", background=self.colors["bg"], font=self.fonts["body"])
-        style.configure("TButton", font=self.fonts["body"], padding=(10, 4))
-        style.configure("Accent.TButton", font=self.fonts["drop"], padding=(14, 6))
-
-        self._menu()
-
-        outer = ttk.Frame(root, padding=(18, 12, 18, 12))
-        outer.pack(fill="both", expand=True)
-        ttk.Label(outer, text="Stage Chart", font=self.fonts["title"]).pack(anchor="w")
-        ttk.Label(outer, foreground=self.colors["muted"],
-                  text="Turns a chord chart PDF into a light, two-column, 17pt stage chart in the same key.\n"
-                       "The original PDF is never changed.").pack(anchor="w", pady=(0, 10))
-
-        # ---- sources (one panel today; tabs once Planning Center is added)
-        if len(SOURCES) == 1:
-            SOURCES[0].build(outer, self).pack(fill="x")
-        else:
-            nb = ttk.Notebook(outer)
-            nb.pack(fill="x")
-            for s in SOURCES:
-                nb.add(s.build(nb, self), text=s.title)
-
-        # ---- where to save
-        save = ttk.Frame(outer)
-        save.pack(fill="x", pady=(12, 0))
-        ttk.Label(save, text="Save stage charts:").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.save_mode = tk.StringVar(value=self.settings.get("save_mode", "beside"))
-        ttk.Radiobutton(save, text="Next to the original", value="beside", variable=self.save_mode,
-                        command=self._save_mode_changed).grid(row=0, column=1, sticky="w")
-        ttk.Radiobutton(save, text="In this folder:", value="folder", variable=self.save_mode,
-                        command=self._save_mode_changed).grid(row=1, column=1, sticky="w")
-        self.folder_label = ttk.Label(save, text="", foreground=self.colors["muted"])
-        self.folder_label.grid(row=1, column=2, sticky="w", padx=(4, 8))
-        ttk.Button(save, text="Change…", command=self._pick_folder).grid(row=1, column=3, sticky="e")
-        save.columnconfigure(2, weight=1)
-        self._show_folder()
-
-        # ---- log
-        logf = ttk.Frame(outer)
-        logf.pack(fill="both", expand=True, pady=(12, 6))
-        self.logbox = tk.Text(logf, height=8, wrap="word", font=self.fonts["log"], relief="flat",
-                              bg="white", fg=self.colors["text"], padx=10, pady=8, highlightthickness=1,
-                              highlightbackground="#d2d2d7")
-        sb = ttk.Scrollbar(logf, command=self.logbox.yview)
-        self.logbox.configure(yscrollcommand=sb.set)
-        self.logbox.pack(side="left", fill="both", expand=True)
-        sb.pack(side="right", fill="y")
-        self.logbox.tag_configure("ok", foreground=self.colors["ok"])
-        self.logbox.tag_configure("bad", foreground=self.colors["bad"])
-        hint = ("Drop PDFs above, click Choose PDFs, or right-click PDFs in File Explorer and use Send to > "
-                "Stage Chart.") if self.dnd_ok else "Click Choose PDFs, or drop PDFs onto the Stage Chart icon."
-        self.say(hint)
-        self.register_drop_target(self.logbox)
-
-        # ---- results
-        btns = ttk.Frame(outer)
-        btns.pack(fill="x")
-        self.open_btn = ttk.Button(btns, text="Open Chart", state="disabled",
-                                   command=lambda: self.last_out and wp.open_file(self.last_out))
-        self.show_btn = ttk.Button(btns, text="Show in Folder", state="disabled",
-                                   command=lambda: self.last_out and wp.show_in_folder(self.last_out))
-        self.open_btn.pack(side="left")
-        self.show_btn.pack(side="left", padx=6)
-
-        self.queue = jobs.ConversionQueue(self._job_started, self._job_done, log_error)
-        self._pump()
-        self._start_updates()
-        if initial_files:
-            root.after(200, lambda: self.submit(initial_files))
-        root.after(600, self._first_run)
-
-    # ------------------------------------------------------------------ public, used by sources
-    def say(self, text, tag=None):
-        self.logbox.configure(state="normal")
-        self.logbox.insert("end", text + "\n", tag)
-        self.logbox.see("end")
-        self.logbox.configure(state="disabled")
-
-    def out_dir(self):
-        if self.save_mode.get() == "folder" and os.path.isdir(self.settings.get("save_folder", "")):
-            return self.settings["save_folder"]
-        return None
-
-    def submit(self, paths, labels=None, origin="file"):
-        """Queue PDFs for conversion. Sources call this; labels are optional display names."""
-        labels = labels or [""] * len(paths)
-        todo = []
-        for p, lab in zip(paths, labels):
-            if os.path.isdir(p):
-                self.say(f"✗ {os.path.basename(p)}: that's a folder. Choose the PDFs inside it.", "bad")
-            elif not p.lower().endswith(".pdf"):
-                self.say(f"✗ {os.path.basename(p)}: only PDF files can be converted.", "bad")
-            else:
-                todo.append(jobs.Job(p, self.out_dir(), lab, origin))
-        self.pending += len(todo)
-        self.queue.submit(todo)
-
-    def register_drop_target(self, widget):
-        if not self.dnd_ok:
-            return
-        try:
-            widget.drop_target_register(self._dnd_files)
-            widget.dnd_bind("<<Drop>>", self._on_drop)
-            if "highlightbackground" in widget.keys() and not isinstance(widget, self.tk.Text):
-                widget.dnd_bind("<<DropEnter>>", lambda e, w=widget: self._hot(w, True))
-                widget.dnd_bind("<<DropLeave>>", lambda e, w=widget: self._hot(w, False))
-        except Exception:
-            log_error("drop target:\n" + traceback.format_exc())
-
-    # ------------------------------------------------------------------ internals
-    def _hot(self, w, on):
-        c = self.colors
-        try:
-            w.configure(highlightbackground=c["drop_hot_border" if on else "drop_border"],
-                        bg=c["drop_hot" if on else "drop"])
-            for ch in w.winfo_children():
-                if isinstance(ch, self.tk.Label):
-                    ch.configure(bg=c["drop_hot" if on else "drop"])
-        except Exception:
-            pass
-        return "copy"
-
-    def _on_drop(self, event):
-        paths = [p for p in self.root.tk.splitlist(event.data) if p]
-        self.submit(paths)
-        try:
-            self._hot(event.widget, False)
-        except Exception:
-            pass
-        return "copy"
-
-    def _job_started(self, job):
-        self.say(f"Converting {job.label or os.path.basename(job.path)} …")
-
-    def _job_done(self, res):
-        self.pending = max(0, self.pending - 1)
-        if res.ok:
-            self.say(f"✓ Saved “{os.path.basename(res.out)}”", "ok")
-            for s in res.lines:
-                self.say("    " + s)
-            self.last_out = res.out
-            self.open_btn.configure(state="normal")
-            self.show_btn.configure(state="normal")
-        else:
-            for s in res.lines:
-                self.say("✗ " + s, "bad")
-
-    def _pump(self):
-        self.queue.drain()
-        self.root.after(100, self._pump)
-
-    def _show_folder(self):
-        f = self.settings.get("save_folder", "")
-        self.folder_label.configure(text=f if f else "(none chosen)")
-
-    def _save_mode_changed(self):
-        if self.save_mode.get() == "folder" and not os.path.isdir(self.settings.get("save_folder", "")):
-            if not self._pick_folder():
-                self.save_mode.set("beside")
-        self.settings["save_mode"] = self.save_mode.get()
-        self.settings.save()
-
-    def _pick_folder(self):
-        from tkinter import filedialog
-        d = filedialog.askdirectory(parent=self.root, title="Save stage charts in this folder",
-                                    initialdir=self.settings.get("save_folder") or os.path.expanduser("~"))
-        if not d:
-            return False
-        self.settings["save_folder"] = os.path.normpath(d)
-        self.save_mode.set("folder")
-        self.settings["save_mode"] = "folder"
-        self.settings.save()
-        self._show_folder()
-        return True
-
-    def _menu(self):
-        tk = self.tk
-        bar = tk.Menu(self.root)
-        m = tk.Menu(bar, tearoff=0)
-        m.add_command(label="Add shortcuts (Desktop, Start menu, Send to)", command=self._add_shortcuts)
-        m.add_command(label="Remove shortcuts", command=self._remove_shortcuts)
-        m.add_separator()
-        m.add_command(label="Open log folder", command=lambda: self._open_dir(os.path.dirname(LOG)))
-        m.add_separator()
-        self.auto_update = tk.BooleanVar(value=True)
-        m.add_checkbutton(label="Check for updates automatically", variable=self.auto_update,
-                          command=self._auto_update_changed)
-        m.add_separator()
-        m.add_command(label="Exit", command=self.root.destroy)
-        bar.add_cascade(label="Options", menu=m)
-        h = tk.Menu(bar, tearoff=0)
-        h.add_command(label="Check for Updates…", command=self._check_updates)
-        h.add_separator()
-        h.add_command(label="About Stage Chart", command=self._about)
-        bar.add_cascade(label="Help", menu=h)
-        self.root.config(menu=bar)
-
-    def _start_updates(self):
-        self.updates = None
-        try:
-            import update_ui
-            import updater
-            self.auto_update.set(updater.load_state().get("auto_check", True))
-            self.updates = update_ui.UpdateUI(self.root, say=self.say, log_path=LOG, log_error=log_error,
-                                              busy=lambda: self.pending > 0, quit=self.root.destroy)
-            self.updates.start()
-        except Exception:
-            log_error("updates unavailable:\n" + traceback.format_exc())
-
-    def _check_updates(self):
-        if self.updates:
-            self.updates.check_now()
-
-    def _auto_update_changed(self):
-        import updater
-        state = updater.load_state()
-        state["auto_check"] = bool(self.auto_update.get())
-        updater.save_state(state)
-
-    def _open_dir(self, d):
-        os.makedirs(d, exist_ok=True)
-        wp.open_file(d)
-
-    def _about(self):
-        from tkinter import messagebox
-        messagebox.showinfo("About Stage Chart",
-                            f"Stage Chart {VERSION} for Windows\n\n"
-                            "Light mode, two columns, 17pt lyrics, original key, page count matched where "
-                            "possible, repeats shown once with ×2, bridges printed in order with cues, "
-                            "slash chords like D/F#.\n\nFont: Carlito (SIL Open Font License).",
-                            parent=self.root)
-
-    def _add_shortcuts(self, quiet_ok=False):
-        from tkinter import messagebox
+    def settings_extras(self, win, dialog):
+        """Shortcuts (Desktop, Start menu, right-click Send to) in the Settings window."""
         if not wp.IS_WIN:
             return
+        from widgets import Pill, label
+        L = win.look
+        box = dialog.section("Shortcuts")
+        label(box, L, "Put Stage Chart on the Desktop and Start menu, and in the right-click “Send to” menu "
+                      "for PDFs.", size=13, color="muted", wrap=440).pack(fill="x", pady=(0, L.px(10)))
+        import tkinter as tk
+        from widgets import T
+        row = tk.Frame(box, bg=T["card"])
+        row.pack(fill="x")
+        Pill(row, L, "Add shortcuts", lambda: self.add_shortcuts(win), kind="outline", size=13, height=36,
+             padx=14, weight="semibold").pack(side="left")
+        Pill(row, L, "Remove shortcuts", lambda: self.remove_shortcuts(win), kind="outline", size=13, height=36,
+             padx=14, weight="semibold").pack(side="left", padx=(win.look.px(10), 0))
+
+    def add_shortcuts(self, win, quiet_ok=False):
+        from tkinter import messagebox
         made, errors = wp.make_shortcuts()
         if errors:
             log_error("shortcuts:\n" + "\n".join(errors))
             messagebox.showwarning("Stage Chart", "Some shortcuts couldn't be made:\n\n" + "\n".join(errors),
-                                   parent=self.root)
+                                   parent=win.root)
         elif made and not quiet_ok:
-            messagebox.showinfo("Stage Chart", "Added Stage Chart to your " + ", ".join(made) + ".",
-                                parent=self.root)
-        if made:
-            self.say("Added shortcuts: " + ", ".join(made) + ".")
+            messagebox.showinfo("Stage Chart", "Added Stage Chart to your " + ", ".join(made) + ".", parent=win.root)
 
-    def _remove_shortcuts(self):
-        wp.remove_shortcuts()
-        self.say("Removed the Desktop, Start menu and Send to shortcuts.")
-
-    def _first_run(self):
+    def remove_shortcuts(self, win):
         from tkinter import messagebox
-        if self.settings.get("asked_shortcuts") or not wp.IS_WIN or not os.path.exists(wp.app_exe()):
+        wp.remove_shortcuts()
+        messagebox.showinfo("Stage Chart", "Removed the Desktop, Start menu and Send to shortcuts.", parent=win.root)
+
+    def first_run(self, win):
+        from tkinter import messagebox
+        s = win.settings
+        if s.get("asked_shortcuts") or not wp.IS_WIN or not os.path.exists(wp.app_exe()):
             return
-        self.settings["asked_shortcuts"] = True
-        self.settings.save()
+        s["asked_shortcuts"] = True
+        s.save()
         if messagebox.askyesno(
                 "Stage Chart",
                 "Add Stage Chart to your Desktop and Start menu, and to the right-click \"Send to\" menu "
-                "for PDFs?\n\nYou can change this later under Options.", parent=self.root):
-            self._add_shortcuts(quiet_ok=True)
-
-    def run(self):
-        self.root.lift()
-        self.root.focus_force()
-        self.root.mainloop()
+                "for PDFs?\n\nYou can change this later in Settings.", parent=win.root):
+            self.add_shortcuts(win, quiet_ok=True)
 
 
 def main():
@@ -361,7 +127,8 @@ def main():
     wp.enable_dpi_awareness()
     wp.set_app_id()
     try:
-        StageChartWindow(files).run()
+        import window
+        window.StageChartWindow(WindowsPlatform(), files).run()
     except Exception:
         log_error(traceback.format_exc())
         try:
