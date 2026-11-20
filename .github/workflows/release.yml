@@ -1,0 +1,134 @@
+# Builds the Mac and Windows apps, tests them on real Macs and Windows PCs, and (when run by hand from
+# the Actions tab with a version number) publishes them as a GitHub Release. The apps' "Check for
+# Updates" looks at the latest release, so publishing a release is how an update reaches the apps.
+#
+# To release:  Actions > Build and release > Run workflow > enter the version (for example 1.1.0) and
+#              what changed. Pull requests run the same build and tests without releasing anything.
+name: Build and release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example 1.1.0 (must be higher than the last release)"
+        required: true
+      notes:
+        description: "What's new (shown in the app's update window)"
+        required: false
+        default: ""
+  pull_request:
+    paths: ["app/**", "windows/**", "tools/**", "tests/**", ".github/workflows/release.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-mingw-w64-x86-64 llvm fonts-dejavu-core
+          python -m pip install -q zstandard pillow reportlab pdfminer.six
+          sudo ln -sf "$(ls /usr/bin/llvm-lipo* | head -1)" /usr/local/bin/llvm-lipo
+      - name: Set version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          v = os.environ["VERSION"].strip().lstrip("vV")
+          if not re.fullmatch(r"\d+(\.\d+){0,2}", v):
+              sys.exit(f"Version must look like 1.1.0, not {v!r}")
+          p = "app/version.py"
+          s = open(p).read()
+          open(p, "w").write(re.sub(r'VERSION = "[^"]*"', f'VERSION = "{v}"', s))
+          print("version", v)
+          PY
+      - name: Unit tests
+        run: python -m unittest tests/test_updater.py -v
+      - name: Build Mac app
+        run: |
+          python tools/fetch_mac_deps.py "$RUNNER_TEMP/mac"
+          python tools/build_app.py "$RUNNER_TEMP/mac/runtime-arm64" "$RUNNER_TEMP/mac/runtime-x86_64" \
+            "$RUNNER_TEMP/mac/wheels" "$RUNNER_TEMP/mac/out" dist/StageChart-mac.zip
+      - name: Build Windows app
+        run: |
+          python windows/fetch_windows_deps.py "$RUNNER_TEMP/win"
+          python windows/build_windows.py "$RUNNER_TEMP/win/runtime" "$RUNNER_TEMP/win/wheels" \
+            "$RUNNER_TEMP/win/out" dist/StageChart-windows.zip
+      - name: Sample charts for the smoke tests
+        run: python tests/make_samples.py dist/samples
+      - uses: actions/upload-artifact@v4
+        with:
+          name: builds
+          path: dist/
+          retention-days: 14
+
+  test-mac:
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: builds
+          path: dist
+      - name: Install like a user would
+        run: |
+          mkdir -p "$HOME/Applications" "$RUNNER_TEMP/unzip"
+          ditto -x -k dist/StageChart-mac.zip "$RUNNER_TEMP/unzip"
+          mv "$RUNNER_TEMP/unzip/Stage Chart/Stage Chart.app" "$HOME/Applications/"
+      - name: Smoke test (convert, Tk, HTTPS, update and restart)
+        run: python3 tests/smoke_installed.py "$HOME/Applications/Stage Chart.app" dist/samples
+      - name: Update log
+        if: always()
+        run: cat "$HOME/Library/Logs/Stage Chart.log" 2>/dev/null || true
+
+  test-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: builds
+          path: dist
+      - name: Install like a user would
+        shell: pwsh
+        run: Expand-Archive -LiteralPath dist\StageChart-windows.zip -DestinationPath "$env:RUNNER_TEMP\install"
+      - name: Smoke test (convert, Tk, HTTPS, update and restart)
+        shell: pwsh
+        run: python tests\smoke_installed.py "$env:RUNNER_TEMP\install\Stage Chart" dist\samples
+      - name: Update log
+        if: always()
+        shell: pwsh
+        run: Get-Content "$env:LOCALAPPDATA\Stage Chart\Stage Chart.log" -ErrorAction SilentlyContinue
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [test-mac, test-windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: builds
+          path: dist
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          V="${VERSION#v}"; V="${V#V}"
+          gh release create "v$V" dist/StageChart-mac.zip dist/StageChart-windows.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Stage Chart $V" \
+            --notes "${NOTES:-Stage Chart $V}"

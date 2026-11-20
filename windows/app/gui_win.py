@@ -26,8 +26,7 @@ for _var, _sub in (("TCL_LIBRARY", "tcl8.6"), ("TK_LIBRARY", "tk8.6")):
 import jobs  # noqa: E402
 import settings as settings_mod  # noqa: E402
 import winplatform as wp  # noqa: E402
-
-VERSION = "1.0"
+from version import VERSION  # noqa: E402
 LOG = os.path.join(settings_mod.log_dir(), "Stage Chart.log")
 
 
@@ -53,6 +52,7 @@ class StageChartWindow:
         self.tk = tk
         self.settings = settings_mod.Settings()
         self.last_out = None
+        self.pending = 0
         self.dnd_ok = False
         self._dnd_files = None
 
@@ -153,6 +153,7 @@ class StageChartWindow:
 
         self.queue = jobs.ConversionQueue(self._job_started, self._job_done, log_error)
         self._pump()
+        self._start_updates()
         if initial_files:
             root.after(200, lambda: self.submit(initial_files))
         root.after(600, self._first_run)
@@ -180,6 +181,7 @@ class StageChartWindow:
                 self.say(f"✗ {os.path.basename(p)}: only PDF files can be converted.", "bad")
             else:
                 todo.append(jobs.Job(p, self.out_dir(), lab, origin))
+        self.pending += len(todo)
         self.queue.submit(todo)
 
     def register_drop_target(self, widget):
@@ -220,6 +222,7 @@ class StageChartWindow:
         self.say(f"Converting {job.label or os.path.basename(job.path)} …")
 
     def _job_done(self, res):
+        self.pending = max(0, self.pending - 1)
         if res.ok:
             self.say(f"✓ Saved “{os.path.basename(res.out)}”", "ok")
             for s in res.lines:
@@ -268,12 +271,40 @@ class StageChartWindow:
         m.add_separator()
         m.add_command(label="Open log folder", command=lambda: self._open_dir(os.path.dirname(LOG)))
         m.add_separator()
+        self.auto_update = tk.BooleanVar(value=True)
+        m.add_checkbutton(label="Check for updates automatically", variable=self.auto_update,
+                          command=self._auto_update_changed)
+        m.add_separator()
         m.add_command(label="Exit", command=self.root.destroy)
         bar.add_cascade(label="Options", menu=m)
         h = tk.Menu(bar, tearoff=0)
+        h.add_command(label="Check for Updates…", command=self._check_updates)
+        h.add_separator()
         h.add_command(label="About Stage Chart", command=self._about)
         bar.add_cascade(label="Help", menu=h)
         self.root.config(menu=bar)
+
+    def _start_updates(self):
+        self.updates = None
+        try:
+            import update_ui
+            import updater
+            self.auto_update.set(updater.load_state().get("auto_check", True))
+            self.updates = update_ui.UpdateUI(self.root, say=self.say, log_path=LOG, log_error=log_error,
+                                              busy=lambda: self.pending > 0, quit=self.root.destroy)
+            self.updates.start()
+        except Exception:
+            log_error("updates unavailable:\n" + traceback.format_exc())
+
+    def _check_updates(self):
+        if self.updates:
+            self.updates.check_now()
+
+    def _auto_update_changed(self):
+        import updater
+        state = updater.load_state()
+        state["auto_check"] = bool(self.auto_update.get())
+        updater.save_state(state)
 
     def _open_dir(self, d):
         os.makedirs(d, exist_ok=True)

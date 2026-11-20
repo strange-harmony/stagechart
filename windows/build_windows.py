@@ -81,6 +81,8 @@ def copy_runtime(src, dst):
 def copy_app(wheels, dst, ico):
     os.makedirs(dst)
     shutil.copy2(os.path.join(ROOT, "app", "stagechart.py"), dst)      # the shared engine, unchanged
+    for f in ("version.py", "updater.py", "update_ui.py"):                # shared update code
+        shutil.copy2(os.path.join(ROOT, "app", f), dst)
     shutil.copytree(os.path.join(ROOT, "app", "fonts"), os.path.join(dst, "fonts"))
     for f in glob.glob(os.path.join(WIN, "app", "*.py")):
         shutil.copy2(f, dst)

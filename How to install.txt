@@ -49,5 +49,7 @@ Worth knowing:
 * Always give a new chart a quick look before rehearsal. Chord placement is read from the
   PDF's layout, so an unusual chart can put a chord a syllable early or late.
 * Scanned charts (a picture of a page, with no real text) can't be read.
+* Updates: Stage Chart checks for a new version once a day. When there is one, click
+  "Install and Restart". You can also choose Stage Chart > Check for Updates... at any time.
 * Handwritten notes aren't added. Those still need to be added by hand.
 * If something goes wrong, details are written to ~/Library/Logs/Stage Chart.log
