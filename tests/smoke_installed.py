@@ -45,8 +45,9 @@ def run_py(install, code, *args, timeout=300):
         env["TK_LIBRARY"] = os.path.join(install, "runtime", "tcl", "tk8.6")
     prelude = (f"import sys; sys.path[:0] = [{app!r}, {os.path.join(app, 'vendor')!r}]; "
                "sys.argv[1:] = " + repr(list(args)) + "\n")
-    r = subprocess.run([py, "-B", "-E", "-s", "-c", prelude + code], capture_output=True, text=True,
-                       timeout=timeout, env=env)
+    # -X utf8: the engine prints ×, → and ♯, which a Windows console code page can't encode
+    r = subprocess.run([py, "-B", "-E", "-s", "-X", "utf8", "-c", prelude + code], capture_output=True,
+                       encoding="utf-8", errors="replace", timeout=timeout, env=env)
     print(r.stdout, end="")
     if r.returncode != 0:
         print(r.stderr)
