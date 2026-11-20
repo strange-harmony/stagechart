@@ -1,0 +1,55 @@
+STAGE CHART for Windows
+=======================
+
+Turns a chord chart PDF (MultiTracks, SongSelect, or one downloaded from Planning Center)
+into a stage chart: light background, two columns, 17pt lyrics, same key as the original.
+The original PDF is never changed.
+
+Works on Windows 10 and 11 (64-bit). Nothing else to install, and no administrator rights needed.
+
+
+INSTALL (one time, about 2 minutes)
+-----------------------------------
+1. Find "Stage Chart for Windows.zip" in your Downloads folder.
+2. Right-click it and choose "Extract All...". Pick a place to keep it, for example your
+   Documents folder, and click "Extract". (Don't run it from inside the zip. It won't work there.)
+3. Open the extracted "Stage Chart" folder and double-click "Stage Chart" (the one with the icon,
+   "Stage Chart.exe").
+4. Windows may show a blue box that says "Windows protected your PC", because the app isn't
+   from the Microsoft Store and isn't signed. Click "More info", then "Run anyway".
+   You only need to do this once.
+5. Stage Chart asks whether to add itself to your Desktop, Start menu and right-click
+   "Send to" menu. Click "Yes" (recommended).
+
+Keep "Stage Chart.exe" in its folder next to "app" and "runtime". Use the shortcuts to start it.
+If you move the folder later, choose Options > Add shortcuts again.
+
+
+USING IT
+--------
+* Drag chart PDFs onto the Stage Chart window, or click "Choose PDFs...". Several at once is fine.
+* Or, in File Explorer, select PDFs, right-click, and choose Send to > Stage Chart.
+  (On Windows 11, choose "Show more options" first to see "Send to".)
+* Or drag PDFs onto the Stage Chart icon on your Desktop.
+* By default each stage chart is saved next to its original, named like
+      "God of the Promise - Stage Chart - D (Light).pdf"
+  To collect them in one folder instead, choose "In this folder" and pick the folder.
+* Click "Open Chart" or "Show in Folder" to see the newest one.
+
+What it does to each chart:
+* Light colors: black lyrics, dark red chords, blue cues.
+* Two columns, 17pt lyrics. If the chart runs longer than the original, it tightens the
+  spacing to try to match the original's page count (the text stays 17pt).
+* Same key as the original. It never transposes.
+* Back-to-back repeated sections are shown once with "x2" (with each pass's cue).
+* Bridges and other sections that come back later are printed again, in order, with their cues.
+* Slash chords are written properly, for example D/F# (some PDFs drop the sharp).
+
+Worth knowing:
+* Always give a new chart a quick look before rehearsal. Chord placement is read from the
+  PDF's layout, so an unusual chart can put a chord a syllable early or late.
+* Scanned charts (a picture of a page, with no real text) can't be read.
+* Handwritten notes aren't added. Those still need to be added by hand.
+* If something goes wrong, choose Options > Open log folder. The details are in
+  "Stage Chart.log" (in %LOCALAPPDATA%\Stage Chart).
+* To uninstall: Options > Remove shortcuts, then delete the "Stage Chart" folder.
