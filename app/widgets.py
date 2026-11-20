@@ -643,6 +643,7 @@ def dark_title_bar(root):
     """Ask the system for a dark window frame to match (Windows 10 1809+ and macOS 10.14+)."""
     try:
         if IS_MAC:
+            root.update_idletasks()          # Tk needs the window to exist before it can set its appearance
             root.tk.call("::tk::unsupported::MacWindowStyle", "appearance", root, "darkaqua")
         elif IS_WIN:
             import ctypes
