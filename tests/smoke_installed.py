@@ -174,6 +174,7 @@ def stop_app(install):
 
 
 def main(install, samples):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")     # the CI console may not be UTF-8
     install = os.path.abspath(install)
     step(1, "convert sample charts")
     convert(install, samples)
