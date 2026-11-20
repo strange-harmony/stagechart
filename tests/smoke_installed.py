@@ -84,8 +84,8 @@ def make_release_zip(install, dest_zip):
     """Copy the install, mark it NEW_VERSION, and zip it the way the release workflow does."""
     stage = tempfile.mkdtemp()
     top = os.path.join(stage, "Stage Chart")
-    os.makedirs(top)
     if IS_MAC:
+        os.makedirs(top)
         app = os.path.join(top, "Stage Chart.app")
         subprocess.check_call(["ditto", install, app])
         plist = os.path.join(app, "Contents", "Info.plist")
