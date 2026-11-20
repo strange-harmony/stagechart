@@ -55,6 +55,7 @@ jobs:
         run: python -m unittest tests/test_updater.py -v
       - name: Build Mac app
         run: |
+          mkdir -p dist
           python tools/fetch_mac_deps.py "$RUNNER_TEMP/mac"
           python tools/build_app.py "$RUNNER_TEMP/mac/runtime-arm64" "$RUNNER_TEMP/mac/runtime-x86_64" \
             "$RUNNER_TEMP/mac/wheels" "$RUNNER_TEMP/mac/out" dist/StageChart-mac.zip
